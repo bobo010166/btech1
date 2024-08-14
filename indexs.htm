@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول وعرض البيانات</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        h2 {
+            color: #333;
+        }
+        #login, #resultSection {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        input[type="text"], button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4cae4c;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: #fff;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login">
+        <h2>تسجيل الدخول</h2>
+        <input type="text" id="code" placeholder=" ادخل الكود الخاص بالموظف ">
+        <button onclick="checkCode()">عرض تفاصيل الماموريات</button>
+    </div>
+
+    <div id="resultSection" style="display:none;">
+        <h2>البيانات</h2>
+        <div id="result">جاري تحميل البيانات...</div>
+        <button id="downloadBtn" style="display:none;" onclick="downloadExcel()">تحميل كـ Excel</button>
+    </div>
+
+    <script>
+        let filteredData; // لتخزين البيانات التي سيتم تصفيتها بناءً على الكود المدخل
+        let data; // لتخزين البيانات الأصلية من الشيت
+
+        const sheetId = '1mxzTMipz_-hWCzDt_zrNTE4b77Lqgi7Zb7Vzc6AjeL0';
+        const apiKey = 'AIzaSyCenQ79V1b4r1NevD3mwdFn-6DMG5DVqG0';
+        const range = '1!A1:n100'; // افترض أن النطاق يحتوي على ما يكفي من الصفوف
+
+        function checkCode() {
+            const codeInput = document.getElementById('code').value.trim();
+            if (!codeInput) {
+                alert('يرجى إدخال الكود');
+                return;
+            }
+
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(sheetData => {
+                    data = sheetData;
+                    const values = data.values;
+                    const headers = values[0];
+                    filteredData = values.slice(1).filter(row => row[0] === codeInput);
+
+                    if (filteredData.length > 0) {
+                        // بناء جدول HTML لعرض البيانات
+                        let table = '<table><tr>';
+                        
+                        // إنشاء رؤوس الجدول
+                        headers.forEach(header => {
+                            table += `<th>${header}</th>`;
+                        });
+                        table += '</tr>';
+                        
+                        // إضافة الصفوف المقابلة للكود المدخل
+                        filteredData.forEach(row => {
+                            table += '<tr>';
+                            row.forEach(cell => {
+                                table += `<td>${cell}</td>`;
+                            });
+                            table += '</tr>';
+                        });
+                        
+                        table += '</table>';
+                        
+                        // عرض الجدول في صفحة الويب
+                        document.getElementById('result').innerHTML = table;
+                        document.getElementById('resultSection').style.display = 'block';
+                        document.getElementById('login').style.display = 'none';
+                        document.getElementById('downloadBtn').style.display = 'block'; // عرض زر التحميل
+                    } else {
+                        document.getElementById('result').innerHTML = 'لم يتم العثور على بيانات لهذا الكود.';
+                        document.getElementById('resultSection').style.display = 'block';
+                        document.getElementById('downloadBtn').style.display = 'none'; // إخفاء زر التحميل إذا لم يتم العثور على بيانات
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('result').innerHTML = 'حدث خطأ أثناء جلب البيانات.';
+                    document.getElementById('resultSection').style.display = 'block';
+                    document.getElementById('downloadBtn').style.display = 'none'; // إخفاء زر التحميل في حالة الخطأ
+                });
+        }
+
+        function downloadExcel() {
+            if (!filteredData || filteredData.length === 0) {
+                alert('لا توجد بيانات لتحميلها.');
+                return;
+            }
+
+            // تجهيز البيانات للتحميل
+            const wsData = [data.values[0]]; // إضافة رؤوس الأعمدة (headers)
+            filteredData.forEach(row => {
+                wsData.push(row); // إضافة الصفوف من البيانات المصفاة
+            });
+
+            // تحويل البيانات إلى ورقة عمل Excel
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+            // إنشاء مصنف جديد
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Data");
+
+            // تحويل المصنف إلى ملف Excel وتحميله
+            XLSX.writeFile(wb, "filtered_data.xlsx");
+        }
+    </script>
+
+</body>
+</html>
