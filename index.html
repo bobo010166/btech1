@@ -8,16 +8,19 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
             padding: 0;
             background-color: #f4f4f4;
         }
         h2 {
             color: #333;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            text-align: center;
         }
         #login, #resultSection {
-            max-width: 400px;
-            margin: 0 auto;
+            max-width: 90%;
+            margin: 20px auto;
             padding: 20px;
             background-color: #fff;
             border-radius: 8px;
@@ -25,15 +28,19 @@
         }
         input[type="text"], button {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             margin: 10px 0;
             box-sizing: border-box;
+            font-size: 1em;
+            border-radius: 4px;
+            border: 1px solid #ccc;
         }
         button {
             background-color: #5cb85c;
             color: white;
             border: none;
             cursor: pointer;
+            font-size: 1em;
         }
         button:hover {
             background-color: #4cae4c;
@@ -45,13 +52,28 @@
             background-color: #fff;
         }
         th, td {
-            padding: 12px;
+            padding: 10px;
             border: 1px solid #ddd;
             text-align: left;
+            font-size: 0.9em;
         }
         th {
             background-color: #f2f2f2;
             font-weight: bold;
+        }
+        /* تحسين التوافق مع الشاشات الصغيرة */
+        @media (max-width: 600px) {
+            th, td {
+                padding: 8px;
+                font-size: 0.8em;
+            }
+            h2 {
+                font-size: 1.2em;
+            }
+            input[type="text"], button {
+                padding: 10px;
+                font-size: 0.9em;
+            }
         }
     </style>
 </head>
@@ -70,12 +92,12 @@
     </div>
 
     <script>
-        let filteredData; // لتخزين البيانات التي سيتم تصفيتها بناءً على الكود المدخل
-        let data; // لتخزين البيانات الأصلية من الشيت
+        let filteredData = []; // لتخزين البيانات التي سيتم تصفيتها بناءً على الكود المدخل
+        let allHeaders = []; // لتخزين جميع رؤوس الأعمدة من كلا الشيتين
 
         const sheetId = '1mxzTMipz_-hWCzDt_zrNTE4b77Lqgi7Zb7Vzc6AjeL0';
         const apiKey = 'AIzaSyCenQ79V1b4r1NevD3mwdFn-6DMG5DVqG0';
-        const range = '1!A1:n800'; // افترض أن النطاق يحتوي على ما يكفي من الصفوف
+        const ranges = ['1!A1:n800', '2!A1:n800']; // نطاقات الشيتين 1 و 2
 
         function checkCode() {
             const codeInput = document.getElementById('code').value.trim();
@@ -84,22 +106,28 @@
                 return;
             }
 
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+            const requests = ranges.map(range => {
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+                return fetch(url).then(response => response.json());
+            });
 
-            fetch(url)
-                .then(response => response.json())
-                .then(sheetData => {
-                    data = sheetData;
-                    const values = data.values;
-                    const headers = values[0];
-                    filteredData = values.slice(1).filter(row => row[0] === codeInput);
+            Promise.all(requests)
+                .then(sheetDataArray => {
+                    sheetDataArray.forEach((data, index) => {
+                        const values = data.values;
+                        const headers = values[0];
+                        if (allHeaders.length === 0) allHeaders = headers; // استخدام رؤوس الأعمدة من أول شيت
+
+                        const filtered = values.slice(1).filter(row => row[0] === codeInput);
+                        filteredData.push(...filtered);
+                    });
 
                     if (filteredData.length > 0) {
                         // بناء جدول HTML لعرض البيانات
                         let table = '<table><tr>';
                         
                         // إنشاء رؤوس الجدول
-                        headers.forEach(header => {
+                        allHeaders.forEach(header => {
                             table += `<th>${header}</th>`;
                         });
                         table += '</tr>';
@@ -141,7 +169,7 @@
             }
 
             // تجهيز البيانات للتحميل
-            const wsData = [data.values[0]]; // إضافة رؤوس الأعمدة (headers)
+            const wsData = [allHeaders]; // إضافة رؤوس الأعمدة (headers)
             filteredData.forEach(row => {
                 wsData.push(row); // إضافة الصفوف من البيانات المصفاة
             });
@@ -160,4 +188,3 @@
 
 </body>
 </html>
-
