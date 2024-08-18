@@ -93,7 +93,7 @@
 
     <script>
         let filteredData = []; // لتخزين البيانات التي سيتم تصفيتها بناءً على الكود المدخل
-        let allHeaders = []; // لتخزين جميع رؤوس الأعمدة من كلا الشيتين
+        let allHeaders = []; // لتخزين جميع رؤوس الأعمدة من الشيت الذي يحتوي على الكود
 
         const sheetId = '1mxzTMipz_-hWCzDt_zrNTE4b77Lqgi7Zb7Vzc6AjeL0';
         const apiKey = 'AIzaSyCenQ79V1b4r1NevD3mwdFn-6DMG5DVqG0';
@@ -106,60 +106,66 @@
                 return;
             }
 
-            const requests = ranges.map(range => {
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
-                return fetch(url).then(response => response.json());
-            });
+            let codeFound = false; // متغير للتحقق من وجود الكود في أي شيت
 
-            Promise.all(requests)
-                .then(sheetDataArray => {
-                    sheetDataArray.forEach((data, index) => {
+            // استخدام حلقة for لتنفيذ طلبات الفتش بالتتابع وليس بشكل متوازي
+            (async () => {
+                for (let range of ranges) {
+                    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+                    try {
+                        const response = await fetch(url);
+                        const data = await response.json();
                         const values = data.values;
                         const headers = values[0];
-                        if (allHeaders.length === 0) allHeaders = headers; // استخدام رؤوس الأعمدة من أول شيت
-
-                        const filtered = values.slice(1).filter(row => row[0] === codeInput);
-                        filteredData.push(...filtered);
-                    });
-
-                    if (filteredData.length > 0) {
-                        // بناء جدول HTML لعرض البيانات
-                        let table = '<table><tr>';
                         
-                        // إنشاء رؤوس الجدول
-                        allHeaders.forEach(header => {
-                            table += `<th>${header}</th>`;
+                        const filtered = values.slice(1).filter(row => row[0] === codeInput);
+                        
+                        if (filtered.length > 0) {
+                            codeFound = true;
+                            allHeaders = headers;
+                            filteredData = filtered;
+                            break; // إيقاف التحقق من الشيتات الأخرى عند العثور على الكود
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        document.getElementById('result').innerHTML = 'حدث خطأ أثناء جلب البيانات.';
+                        document.getElementById('resultSection').style.display = 'block';
+                        return;
+                    }
+                }
+
+                if (codeFound) {
+                    // بناء جدول HTML لعرض البيانات
+                    let table = '<table><tr>';
+                    
+                    // إنشاء رؤوس الجدول
+                    allHeaders.forEach(header => {
+                        table += `<th>${header}</th>`;
+                    });
+                    table += '</tr>';
+                    
+                    // إضافة الصفوف المقابلة للكود المدخل
+                    filteredData.forEach(row => {
+                        table += '<tr>';
+                        row.forEach(cell => {
+                            table += `<td>${cell}</td>`;
                         });
                         table += '</tr>';
-                        
-                        // إضافة الصفوف المقابلة للكود المدخل
-                        filteredData.forEach(row => {
-                            table += '<tr>';
-                            row.forEach(cell => {
-                                table += `<td>${cell}</td>`;
-                            });
-                            table += '</tr>';
-                        });
-                        
-                        table += '</table>';
-                        
-                        // عرض الجدول في صفحة الويب
-                        document.getElementById('result').innerHTML = table;
-                        document.getElementById('resultSection').style.display = 'block';
-                        document.getElementById('login').style.display = 'none';
-                        document.getElementById('downloadBtn').style.display = 'block'; // عرض زر التحميل
-                    } else {
-                        document.getElementById('result').innerHTML = 'لم يتم العثور على بيانات لهذا الكود.';
-                        document.getElementById('resultSection').style.display = 'block';
-                        document.getElementById('downloadBtn').style.display = 'none'; // إخفاء زر التحميل إذا لم يتم العثور على بيانات
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('result').innerHTML = 'حدث خطأ أثناء جلب البيانات.';
+                    });
+                    
+                    table += '</table>';
+                    
+                    // عرض الجدول في صفحة الويب
+                    document.getElementById('result').innerHTML = table;
                     document.getElementById('resultSection').style.display = 'block';
-                    document.getElementById('downloadBtn').style.display = 'none'; // إخفاء زر التحميل في حالة الخطأ
-                });
+                    document.getElementById('login').style.display = 'none';
+                    document.getElementById('downloadBtn').style.display = 'block'; // عرض زر التحميل
+                } else {
+                    document.getElementById('result').innerHTML = 'لم يتم العثور على بيانات لهذا الكود.';
+                    document.getElementById('resultSection').style.display = 'block';
+                    document.getElementById('downloadBtn').style.display = 'none'; // إخفاء زر التحميل إذا لم يتم العثور على بيانات
+                }
+            })();
         }
 
         function downloadExcel() {
